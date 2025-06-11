@@ -18,6 +18,19 @@ function apiListTasks() {
   )
 }
 
+function apiListOperations(task_data){
+  return fetch(apihost + `/api/tasks/${task_data.id}/operations`,{
+      headers: { Authorization: apikey }
+    })
+  .then(function(resp){
+    if(!resp.ok) {
+        alert('Wystąpił błąd! Otwórz devtools i zakładkę Sieć/Network, i poszukaj przyczyny');
+      }
+      return resp.json();
+    }
+  )
+}
+
 function createTask(task_data){
   let section = document.createElement('section');
   console.log('card mt-5 shadow-sm'.split(' '))
@@ -30,14 +43,47 @@ function createTask(task_data){
 
   addTitleAndDesc(task_header,task_data);
   addButtons(task_header,task_data.status)
-  
   //add list
-
-  if(task_data.status =='open'){
-    addForm(section)
-  }
+  addList(section, task_data)
+  .then(function(){
+    //using promise in order to add form after list is added
+    if(task_data.status =='open'){
+      addForm(section)
+    }
+  })
 }
 
+function addList(element, task_data){
+  //returning promise in order to keep correct order of elements
+  return apiListOperations(task_data)
+  .then(function(operations){
+    if(operations == undefined || operations.error){
+    console.log(operations)
+    return
+    }
+    console.log('a')
+    console.log(operations)
+    let ul = document.createElement('ul');
+    ul.className = 'list-group list-group-flush';
+    operations.data.forEach(operation=>{
+      let li = document.createElement('li');
+      li.classList = 'list-group-item d-flex justify-content-between align-items-center';
+      let op_container = document.createElement('div');
+      op_container.innerText = operation.description;
+      let req_time = document.createElement('span');
+      req_time.className = 'badge badge-success badge-pill ml-2';
+      req_time.time = element.timeSpent;
+      op_container.appendChild(req_time);
+      li.appendChild(op_container);
+      addButtons(li);
+      ul.appendChild(li)
+    })
+    console.log('dodaje liste')
+    element.appendChild(ul);
+    })
+}
+
+//add button functionality
 function addForm(element){
   let form_area = document.createElement('div');
   form_area.className = 'card-body';
@@ -61,6 +107,7 @@ function addForm(element){
   form_body.appendChild(button_area);
   form.appendChild(form_body);
   form_area.appendChild(form);
+  console.log('dodaje form')
   element.appendChild(form_area);
 }
 
@@ -115,7 +162,8 @@ document.addEventListener('DOMContentLoaded', function() {
     apiListTasks().then(
   function(response) {
     console.log('Odpowiedź z serwera to:', response);
-    createTask(response.data[0])
+    response.data.forEach(task=>createTask(task));
+    //createTask(response.data[0])
   }
 );
 });
