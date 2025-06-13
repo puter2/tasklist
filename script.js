@@ -1,4 +1,4 @@
-const apikey = '5415cc70-433b-473b-8d71-7bf52cc7fbf6';
+const apikey = '';
 const apihost = 'https://todo-api.coderslab.pl';
 
 
@@ -44,17 +44,17 @@ function createTask(task_data){
   addTitleAndDesc(task_header,task_data);
   addButtons(task_header,task_data)
   //add list
-  addList(section, task_data)
+  addListOfOperations(section, task_data)
   .then(function(){
     //using promise in order to add form after list is added
     if(task_data.status =='open'){
-      addForm(section, task_data.id)
+      addForm(section, task_data)
     }
   })
 }
 
 //TODO: add time formatting
-function addList(element, task_data){
+function addListOfOperations(element, task_data){
   //returning promise in order to keep correct order of elements
   return apiListOperations(task_data)
   .then(function(operations){
@@ -73,10 +73,10 @@ function addList(element, task_data){
       op_container.innerText = operation.description;
       let req_time = document.createElement('span');
       req_time.className = 'badge badge-success badge-pill ml-2';
-      req_time.innerText = operation.timeSpent;
+      req_time.innerText = operation.timeSpent +'m';
       op_container.appendChild(req_time);
       li.appendChild(op_container);
-      addButtons(li,task_data);
+      addButtons(li,operation);
       ul.appendChild(li)
     })
     console.log('dodaje liste')
@@ -96,9 +96,9 @@ function apiAddOperation(event,id){
     return resp;
   })
 }
-//TODO operation button functionality
+
 //add button functionality
-function addForm(element, task_id){
+function addForm(element, task_data){
   let form_area = document.createElement('div');
   form_area.className = 'card-body';
   let form = document.createElement('form');
@@ -126,9 +126,13 @@ function addForm(element, task_id){
 
   form.addEventListener('submit',(e)=>{
     e.preventDefault();
-    apiAddOperation(e, task_id)
+    apiAddOperation(e, task_data.id)
     .then(function(resp){
       console.log(resp)
+      let op_list = e.target.parentElement.parentElement.querySelector('ul');
+      console.log(op_list.children)
+      Array.from(op_list.children).forEach(el=>el.remove());
+      addListOfOperations(op_list, task_data)
     })
   })
 }
@@ -205,25 +209,24 @@ function finishTask(event, task_data){
 }
 
 
-// TODO: add button functionality: finish task, delete task, add time, delete op
-function addButtons(element ,task_data){
+function addButtons(element ,object_data){
   let button_area = document.createElement('div');
   let delete_button = document.createElement('button');
   delete_button.className = 'btn btn-outline-danger btn-sm ml-2';
   delete_button.innerText = 'Delete';
-  console.log('task_data: ',task_data)
-  switch(task_data.status){
+  console.log('task_data: ',object_data)
+  switch(object_data.status){
     case 'open' : {
       let finish = document.createElement('button');
       finish.className = 'btn btn-dark btn-sm';
       finish.innerText = 'Finish';
-      finish.addEventListener('click', (event)=>{finishTask(event, task_data)})
+      finish.addEventListener('click', (event)=>{finishTask(event, object_data)})
       button_area.appendChild(finish);
-      delete_button.addEventListener('click',(event) =>{ deleteTask(event, task_data)});
+      delete_button.addEventListener('click',(event) =>{ deleteTask(event, object_data)});
       break;
     }
     case 'closed' : {
-      delete_button.addEventListener('click',(event) =>{ deleteTask(event, task_data)});
+      delete_button.addEventListener('click',(event) =>{ deleteTask(event, object_data)});
       break;
     }
     default : { //default case is used when adding operations, not new task
@@ -235,12 +238,54 @@ function addButtons(element ,task_data){
       plus1h.innerText = '+1h';
       button_area.appendChild(plus15);
       button_area.appendChild(plus1h);
+
+      delete_button.addEventListener('click',(event) =>{ deleteOperation(event, object_data)});
+      plus15.addEventListener('click',(event) =>{ addTimeToOperation(event, object_data, 15)});
+      plus1h.addEventListener('click',(event) =>{ addTimeToOperation(event, object_data, 60)});
       break;
     }
   }
   button_area.appendChild(delete_button);
 
   element.appendChild(button_area);
+}
+
+function addTimeToOperation(event, op_data, time){
+  apiAddTimeToOperation(op_data, time)
+  .then(function(resp){
+    if(resp.ok){
+      let time_display = event.target.parentElement.previousElementSibling.querySelector('span');
+      time_display.innerText = Number.parseInt(time_display.innerText) + time + 'm';
+    }
+  })
+}
+
+function apiAddTimeToOperation(op_data, time){
+  console.log(op_data)
+  return fetch(apihost + `/api/operations/${op_data.id}`,{
+    method: 'PUT',
+    headers: { Authorization: apikey, 'Content-Type': 'application/json'  },
+    body: JSON.stringify({description: op_data.description, timeSpent: op_data.timeSpent+time})
+  });
+}
+
+
+function deleteOperation(event, op_data){
+  apiDeleteOperation(op_data.id)
+  .then(function(resp){
+    if(resp.ok){
+      event.target.parentElement.parentElement.remove();
+    }
+  })
+}
+
+function apiDeleteOperation(id){
+  return fetch(apihost + `/api/operations/${id}`,{
+      method: 'DELETE',
+      headers: { Authorization: apikey }
+    })
+  .then(function(resp){
+    return resp;})
 }
 
 function apiAddTask(new_task){
