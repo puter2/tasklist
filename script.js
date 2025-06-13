@@ -40,9 +40,9 @@ function createTask(task_data){
   let task_header = document.createElement('div');
   task_header.className='card-header d-flex justify-content-between align-items-center';
   section.appendChild(task_header);
-
+  console.log('dodaje'+task_data)
   addTitleAndDesc(task_header,task_data);
-  addButtons(task_header,task_data.status)
+  addButtons(task_header,task_data)
   //add list
   addList(section, task_data)
   .then(function(){
@@ -53,6 +53,7 @@ function createTask(task_data){
   })
 }
 
+//TODO: add time formatting
 function addList(element, task_data){
   //returning promise in order to keep correct order of elements
   return apiListOperations(task_data)
@@ -72,10 +73,10 @@ function addList(element, task_data){
       op_container.innerText = operation.description;
       let req_time = document.createElement('span');
       req_time.className = 'badge badge-success badge-pill ml-2';
-      req_time.time = element.timeSpent;
+      req_time.innerText = operation.timeSpent;
       op_container.appendChild(req_time);
       li.appendChild(op_container);
-      addButtons(li);
+      addButtons(li,task_data);
       ul.appendChild(li)
     })
     console.log('dodaje liste')
@@ -123,24 +124,88 @@ function addTitleAndDesc(element,task_data){
   element.appendChild(title, task_data.open);
 }
 
-// TODO: add button functionality
-function addButtons(element ,buttons_type){
+function apiDeleteTask(id){
+  return fetch(apihost + `/api/tasks/${id}`,{
+      method: 'DELETE',
+      headers: { Authorization: apikey }
+    })
+  .then(function(resp){
+    return resp;
+  });
+}
+
+function deleteTask(event, task_data){
+  console.log(event.target)
+  let current_task = event.target.parentElement.parentElement.parentElement;
+  
+  apiDeleteTask(task_data.id)
+  .then(function(resp){
+    if(resp.ok){
+      current_task.remove();
+    }
+  })
+}
+
+function apiFinishTask(task_data){
+  let req_body = {title: task_data.title, description: task_data.description, status: "closed"};
+  return fetch(apihost + `/api/tasks/${task_data.id}`,{
+    method: 'PUT',
+    headers: { Authorization: apikey, 'Content-Type': 'application/json'  },
+    body: JSON.stringify(req_body)})
+  .then(function(resp){
+    console.log(resp)
+    return resp;
+  })
+}
+
+function finishTask(event, task_data){
+  let form = event.target.parentElement.parentElement.parentElement.querySelector('.card-body');
+  let list_buttons = event.target.parentElement.parentElement.parentElement.querySelectorAll('li')
+  apiFinishTask(task_data)
+  .then(function(resp){
+    console.log(resp)
+    if(resp.ok){
+      form.remove();
+      console.log(list_buttons)
+      ////////////////////////////
+      //NOT TESTED
+      if(list_buttons.length>0){
+      list_buttons.forEach(li=>{
+          //remove buttons
+          li.lastElementChild.remove()
+        })
+      }
+      ////////////////////////////
+        console.log('finishing task')
+        event.target.remove();
+        
+    }
+  })
+}
+
+
+// TODO: add button functionality: finish task, delete task, add time, delete op
+function addButtons(element ,task_data){
   let button_area = document.createElement('div');
   let delete_button = document.createElement('button');
   delete_button.className = 'btn btn-outline-danger btn-sm ml-2';
   delete_button.innerText = 'Delete';
-  switch(buttons_type){
+  console.log('task_data: ',task_data)
+  switch(task_data.status){
     case 'open' : {
       let finish = document.createElement('button');
       finish.className = 'btn btn-dark btn-sm';
       finish.innerText = 'Finish';
+      finish.addEventListener('click', (event)=>{finishTask(event, task_data)})
       button_area.appendChild(finish);
+      delete_button.addEventListener('click',(event) =>{ deleteTask(event, task_data)});
       break;
     }
     case 'closed' : {
+      delete_button.addEventListener('click',(event) =>{ deleteTask(event, task_data)});
       break;
     }
-    default : {
+    default : { //default case is used when adding operations, not new task
       let plus15 = document.createElement('button');
       let plus1h = document.createElement('button');
       plus15.className = 'btn btn-outline-success btn-sm mr-2';
@@ -157,6 +222,13 @@ function addButtons(element ,buttons_type){
   element.appendChild(button_area);
 }
 
+function apiAddTask(new_task){
+  return fetch(apihost + '/api/tasks',{
+    method: 'POST',
+    headers: { Authorization: apikey, 'Content-Type': 'application/json'  },
+    body: JSON.stringify(new_task)
+  });
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     apiListTasks().then(
@@ -166,4 +238,27 @@ document.addEventListener('DOMContentLoaded', function() {
     //createTask(response.data[0])
   }
 );
+  let add_new_task_form = this.querySelector('.js-task-adding-form');
+  add_new_task_form.addEventListener('submit', function(e){
+    e.preventDefault();
+    let title = this.elements.title.value;
+    let description = this.elements.description.value;
+    console.log(title, description)
+    let new_task = {
+      title: title,
+      description: description,
+      status: 'open'
+    };
+    console.log(new_task.title)
+    apiAddTask(new_task)
+    .then(function(resp){
+      console.log(resp);
+      if(resp.ok){
+        return apiListTasks();
+      }
+    })
+    .then(function(resp){
+      createTask(resp.data[resp.data.length-1])
+    })
+  })
 });
