@@ -1,4 +1,4 @@
-const apikey = '';
+const apikey = '5415cc70-433b-473b-8d71-7bf52cc7fbf6';
 const apihost = 'https://todo-api.coderslab.pl';
 
 
@@ -48,7 +48,7 @@ function createTask(task_data){
   .then(function(){
     //using promise in order to add form after list is added
     if(task_data.status =='open'){
-      addForm(section)
+      addForm(section, task_data.id)
     }
   })
 }
@@ -84,8 +84,21 @@ function addList(element, task_data){
     })
 }
 
+function apiAddOperation(event,id){
+  req_body = {description: event.target.elements[0].value, timeSpent: 0}
+  console.log(req_body)
+  return fetch(apihost + `/api/tasks/${id}/operations`,{
+    method: 'POST',
+    headers: { Authorization: apikey, 'Content-Type': 'application/json'  },
+    body: JSON.stringify(req_body)
+  })
+  .then(function(resp){
+    return resp;
+  })
+}
+//TODO operation button functionality
 //add button functionality
-function addForm(element){
+function addForm(element, task_id){
   let form_area = document.createElement('div');
   form_area.className = 'card-body';
   let form = document.createElement('form');
@@ -110,6 +123,14 @@ function addForm(element){
   form_area.appendChild(form);
   console.log('dodaje form')
   element.appendChild(form_area);
+
+  form.addEventListener('submit',(e)=>{
+    e.preventDefault();
+    apiAddOperation(e, task_id)
+    .then(function(resp){
+      console.log(resp)
+    })
+  })
 }
 
 function addTitleAndDesc(element,task_data){
@@ -230,6 +251,7 @@ function apiAddTask(new_task){
   });
 }
 
+//main
 document.addEventListener('DOMContentLoaded', function() {
     apiListTasks().then(
   function(response) {
